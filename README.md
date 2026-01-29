@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STORY</title>
+    <title>우리들만의 비밀 기록장</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- Firebase SDK & App Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -57,9 +56,8 @@
             return diff >= 0 ? `D+${diff}` : `D${diff}`;
         };
 
-        // 앱 입장 시 호출되는 메인 로직
         function enterApp() {
-            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-screen').classList.remove('hidden');
             startSubscribingData();
             updateUI();
@@ -360,48 +358,55 @@
             }, (error) => console.error("Theme sub error:", error));
         }
 
-        // 로그인 프로세스 시작
+        // Firebase 인증 리스너
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUser = user;
-                // 이미 인증된 기록이 있으면 바로 입장
                 if (localStorage.getItem('couple_diary_auth') === 'true') {
                     enterApp();
                 }
             }
         });
 
+        // 비밀코드 체크 및 입장
         window.checkCode = async (e) => {
             if (e) e.preventDefault();
+            
             const inputEl = document.getElementById('pass-input');
             const btnEl = document.getElementById('connect-btn');
+            const errEl = document.getElementById('error-msg');
+            
             const val = inputEl.value.trim().toUpperCase(); 
             
             if (val === SECRET_CODE) {
-                // 버튼 비활성화 및 로딩 표시
+                // 1. UI 상태 변경
                 btnEl.innerText = "Connecting...";
                 btnEl.disabled = true;
+                errEl.classList.add('hidden');
 
                 try {
-                    // Firebase 익명 로그인이 완료되지 않았을 경우를 대비해 여기서 다시 시도
+                    // 2. 인증 시도 (이미 인증되어 있지 않은 경우만)
                     if (!currentUser) {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
+                            const cred = await signInWithCustomToken(auth, __initial_auth_token);
+                            currentUser = cred.user;
                         } else {
-                            await signInAnonymously(auth);
+                            const cred = await signInAnonymously(auth);
+                            currentUser = cred.user;
                         }
                     }
                     
+                    // 3. 인증 성공 시 플래그 저장 및 입장
                     localStorage.setItem('couple_diary_auth', 'true');
                     enterApp();
                 } catch (err) {
-                    console.error("Auth error:", err);
+                    console.error("Connection Error:", err);
                     btnEl.innerText = "Connect";
                     btnEl.disabled = false;
-                    showError("연결 오류가 발생했어요 😢");
+                    showError("서버와 연결할 수 없어요. 다시 시도해주세요.");
                 }
             } else {
-                showError("코드가 맞지 않아요 😢");
+                showError("비밀코드가 일치하지 않아요.");
             }
         };
 
@@ -412,26 +417,37 @@
                 errEl.innerText = msg;
                 errEl.classList.remove('hidden');
                 inputEl.classList.add('border-red-300');
+                inputEl.value = ""; // 틀렸을 때 입력창 비우기
+                inputEl.focus();
                 setTimeout(() => inputEl.classList.remove('border-red-300'), 1000);
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        window.onload = () => {
+            // 브라우저 자동 완성 방지 및 초기화
+            const passInput = document.getElementById('pass-input');
+            if(passInput) {
+                passInput.value = "";
+                passInput.focus();
+            }
+
             const loginDateEl = document.getElementById('login-date');
             if(loginDateEl) loginDateEl.innerText = `Since 2025.05.28 - Today ${getTodayFormatted()}`;
             lucide.createIcons();
             
-            // 초기 로그인 시도 (Firebase 연결 준비)
+            // 앱 로드 시 익명 인증 미리 준비
             (async () => {
                 try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
+                    if (!auth.currentUser) {
+                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
                     }
-                } catch(e) {}
+                } catch(e) { console.warn("Background auth silent fail:", e); }
             })();
-        });
+        };
 
     </script>
     <style>
@@ -442,9 +458,17 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
         body { font-family: 'Pretendard', sans-serif; -webkit-tap-highlight-color: transparent; }
         input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.3; width: 24px; height: 24px; cursor: pointer; }
+        
+        /* 자동완성 시 배경색 변하는 것 방지 */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus {
+            -webkit-box-shadow: 0 0 0px 1000px #F9FAFB inset;
+            transition: background-color 5000s ease-in-out 0s;
+        }
     </style>
 </head>
-<body>
+<body class="bg-pink-50 min-h-screen">
 
     <!-- 삭제 확인 모달 -->
     <div id="delete-modal" class="fixed inset-0 bg-black/60 z-[200] hidden items-center justify-center p-8 backdrop-blur-md">
@@ -470,10 +494,18 @@
             <h1 class="text-4xl font-black mb-3 text-gray-800 uppercase italic tracking-tighter">INPUT CODE</h1>
             <p id="login-date" class="text-gray-300 mb-12 text-xs font-black tracking-[0.3em] uppercase"></p>
             
-            <form onsubmit="checkCode(event)" class="space-y-6">
-                <input type="password" id="pass-input" placeholder="비밀코드" class="w-full px-8 py-6 bg-gray-50 border-4 border-transparent rounded-[2.5rem] focus:bg-white focus:border-pink-200 outline-none text-center font-black tracking-[0.8em] text-3xl transition-all">
+            <form onsubmit="checkCode(event)" class="space-y-6" autocomplete="off">
+                <input type="password" 
+                       id="pass-input" 
+                       placeholder="CODE" 
+                       autocomplete="new-password"
+                       class="w-full px-8 py-6 bg-gray-50 border-4 border-transparent rounded-[2.5rem] focus:bg-white focus:border-pink-200 outline-none text-center font-black tracking-[0.5em] text-3xl transition-all">
                 <p id="error-msg" class="text-red-400 text-xs font-black hidden uppercase">코드가 맞지 않아요</p>
-                <button type="submit" id="connect-btn" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-black py-6 rounded-[2.5rem] shadow-xl transition-all active:scale-95 text-xl uppercase tracking-widest">Connect</button>
+                <button type="submit" 
+                        id="connect-btn" 
+                        class="w-full bg-pink-500 hover:bg-pink-600 text-white font-black py-6 rounded-[2.5rem] shadow-xl transition-all active:scale-95 text-xl uppercase tracking-widest">
+                    Connect
+                </button>
             </form>
         </div>
     </div>
@@ -486,7 +518,7 @@
                     <div class="p-2 bg-gray-50 rounded-xl shadow-inner">
                         <i data-lucide="heart" class="theme-heart"></i>
                     </div>
-                    <h1 id="header-dday" class="font-black leading-none">D+0</h1>
+                    <h1 id="header-dday" class="font-black leading-none text-pink-500">D+0</h1>
                 </div>
 
                 <div class="flex items-center gap-3">
