@@ -28,7 +28,7 @@
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'couple-diary-html';
         const ANNIVERSARY_DATE = new Date('2025-05-28');
-        const SECRET_CODE = "EVOL";
+        const SECRET_CODE = "EVOL"; // 설정된 비밀번호
 
         let photos = [];
         let messages = [];
@@ -371,21 +371,29 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUser = user;
-                if (localStorage.getItem('isAuth') === 'true') enterApp();
+                // 인증 상태가 로컬에 있으면 바로 입장
+                if (localStorage.getItem('couple_diary_auth') === 'true') {
+                    enterApp();
+                }
             }
         });
 
         window.checkCode = (e) => {
             if (e) e.preventDefault();
-            const val = document.getElementById('pass-input').value.toUpperCase();
+            const inputEl = document.getElementById('pass-input');
+            const val = inputEl.value.trim().toUpperCase(); // 공백 제거 및 대문자 변환
+            
             if (val === SECRET_CODE) {
-                localStorage.setItem('isAuth', 'true');
+                localStorage.setItem('couple_diary_auth', 'true');
                 enterApp();
             } else {
                 const errEl = document.getElementById('error-msg');
                 if(errEl) {
                     errEl.innerText = "코드가 맞지 않아요 😢";
                     errEl.classList.remove('hidden');
+                    // 흔들리는 애니메이션 효과 추가 (선택사항)
+                    inputEl.classList.add('border-red-300');
+                    setTimeout(() => inputEl.classList.remove('border-red-300'), 1000);
                 }
             }
         };
@@ -453,7 +461,7 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <button onclick="localStorage.removeItem('isAuth'); location.reload();" class="p-2 text-gray-300 hover:text-gray-600 transition-colors bg-gray-50 rounded-xl shadow-inner">
+                    <button onclick="localStorage.removeItem('couple_diary_auth'); location.reload();" class="p-2 text-gray-300 hover:text-gray-600 transition-colors bg-gray-50 rounded-xl shadow-inner">
                         <i data-lucide="log-out" size="20"></i>
                     </button>
                 </div>
